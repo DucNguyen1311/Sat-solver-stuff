@@ -59,16 +59,16 @@ def solve(n):
     else:
         print("unsatisfiable");
 
-# entry point
-n_str = input("Enter the board size (N): ");
+if __name__ == "__main__":
+    n_str = input("Enter the board size (N): ");
 
-try:
-    n = int(n_str);
-    print(f"Board size N set to: {n}")
-except ValueError:
-    print("Invalid input. Please enter an integer.")
-    n = 0;
+    try:
+        n = int(n_str);
+        print(f"Board size N set to: {n}")
+    except ValueError:
+        print("Invalid input. Please enter an integer.")
+        n = 0;
 
-solve(n);
+    solve(n);
 
 
