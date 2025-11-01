@@ -24,9 +24,11 @@ int incrementalSearch(int k, int n) {
 
             //add all attacking square its rows and column, excluding for itself (already added)
             for (int k = 0; k < n; k++) {
-                if (k == j) continue;
-                attackList.push(Minisat::mkLit(board[i][k]));
+                if (k != j) {
+                    attackList.push(Minisat::mkLit(board[i][k]));
+                } if (k != i) {
                 attackList.push(Minisat::mkLit(board[k][j]));
+                }
             }
             //add all attacking square in its diagonal. 
             for (int k = 1; k < n; k++) {
