@@ -3,12 +3,8 @@ from pysat.formula import CNF
 import os 
 from pysat.card import CardEnc
 import threading
-import signal
-
-def alarm_handler(signum, frame):
-    raise TimeoutError("Time limit reached!")
-
-signal.signal(signal.SIGALRM, alarm_handler)
+import time
+import traceback
 
 
 class MOFAP_Solver:
@@ -26,6 +22,7 @@ class MOFAP_Solver:
         self.current_max_id = 0
 
     def solve(self, path):
+        start_time = time.time()
         self.parse_dataset(path)
         self.init_vars_matrix()
         self.add_domain_constraints()
@@ -34,13 +31,12 @@ class MOFAP_Solver:
         print(f"Total Clauses: {len(self.cnf.clauses)}")
 
         n_freqs = len(self.freq_list)
-         
-        #create n z variables( zi mean that Fi is used somewhere)
+        
         z_vars = [] 
         for k in range (n_freqs):
             self.current_max_id += 1
             z_vars.append(self.current_max_id)
-        #create trash variables ( use to reduce the z variables that can be used)
+        
         t_vars = []
         for k in range (n_freqs):
             self.current_max_id += 1
@@ -60,60 +56,65 @@ class MOFAP_Solver:
         for k in range(n_freqs - 1):
             self.cnf.append([-t_vars[k], t_vars[k+1]])
 
-        #to begin optimizing, we merge t_vars and z_vars together
-
         all_vars = z_vars + t_vars
 
         cnf_leq = CardEnc.atmost(lits=all_vars, bound=n_freqs, top_id=self.current_max_id)
         self.cnf.extend(cnf_leq.clauses)
         print("Start Optimizing")
+        
         best_result = n_freqs + 1
-        time_out = 30
-        with Solver(name = 'Glucose4', bootstrap_with=self.cnf.clauses) as solver:
+        time_out = 20
+        last_sat_time = 0  
+        
+        # 1. MARK THE START: This is exactly when the solver begins working
+        solver_start_time = time.time()
+        
+        with Solver(name='Glucose42', bootstrap_with=self.cnf.clauses) as solver:
             while True:
-                print(f"  > Solving... (Time limit: {time_out}s)")
-                signal.alarm(time_out)
-                try:
-                    is_sat = solver.solve()
-                    signal.alarm(0)
-                    if (is_sat):
-                        model = solver.get_model()
-                        model_set = set(model)
-                        current_result = sum(1 for z in z_vars if z in model_set)
-
-                        print(f"\n[SAT] Found solution using {current_result} frequencies.")
-                        
-                        best_result = min(best_result, current_result)
-                        target_result = current_result - 1;
-
-                        if target_result < 1:
-                            print('ideal solution reached')
-                            break
-                        
-                        needed_trash_count = n_freqs - target_result
-                        trash_id_to_force_true = n_freqs - needed_trash_count
-                        print(f"  > Optimizing: Aiming for <= {target_result} freqs.")
-                        print(f"  > Injecting {needed_trash_count} trash units (Force s[{trash_id_to_force_true}] = True)")
-                        
-                        # THÊM MỘT CLAUSE DUY NHẤT
-                        solver.add_clause([t_vars[trash_id_to_force_true]])
-                        continue
-                    elif is_sat is False:
-                        print(f"\n[UNSAT] Optimization finished. Best Minimum Order: {best_result}")
-                        break
-                except (TimeoutError, Exception) as e:
-                    # 4. SAFETY: Turn off alarm immediately to prevent double-crashes
-                    signal.alarm(0)
+                # Calculate how much time has passed since we started the solver
+                elapsed_so_far = time.time() - solver_start_time
+                print(f"  > Solving... (Elapsed: {elapsed_so_far:.2f}s, Timeout Limit: {time_out}s)")
+                
+                timer = threading.Timer(time_out, solver.interrupt)
+                timer.start()
+                is_sat = solver.solve_limited(assumptions=[], expect_interrupt=True)
+                timer.cancel()
+                
+                if is_sat:
+                    # 2. RECORD EFFECTIVE TIME: The moment a new best is found
+                    last_sat_time = time.time() - solver_start_time
                     
-                    # 5. Check if it was a Timeout OR a PySAT Interrupt
-                    error_msg = str(e).lower()
-                    if isinstance(e, TimeoutError) or "interrupt" in error_msg:
-                        print(f"\n[TIMEOUT] Solver stopped after {time_out}s.")
-                        print(f"Optimization stopped. Best result found so far: {best_result}")
-                        break
-                    else:
-                        # If it's some other real crash (like MemoryError), re-raise it
-                        raise e
+                    model = solver.get_model()
+                    model_set = set(model)
+                    current_result = sum(1 for z in z_vars if z in model_set)
+
+                    print(f"\n[SAT] Found {current_result} freqs at {last_sat_time:.2f}s.")
+                    
+                    best_result = current_result
+
+                    target_result = current_result - 1
+                    if target_result < 1:
+                        print('Ideal solution reached.')
+                        break # Go to final return
+                    
+                    # Add constraint to find a better solution in the next iteration
+                    needed_trash_count = n_freqs - target_result
+                    trash_id_to_force_true = n_freqs - needed_trash_count
+                    solver.add_clause([t_vars[trash_id_to_force_true]])
+                    continue
+
+                elif is_sat is False:
+                    print(f"\n[UNSAT] Proven optimal. Best: {best_result}")
+                    break
+
+                elif is_sat is None:
+                    print(f"\n[TIMEOUT] Hit {time_out}s limit. Best: {best_result}")
+                    break
+        
+        # 3. CALCULATE TOTAL TIME: Current time minus the start (includes the final 20s)
+        total_duration = time.time() - solver_start_time
+        
+        return best_result, total_duration, last_sat_time
                 
 
 
@@ -122,8 +123,13 @@ class MOFAP_Solver:
         for real_id in self.variable_ids:
             u = self.id_map[real_id]
             dom_id = self.variables[real_id]['dom']
+            fixed = self.variables[real_id]['fixed']
             allowed_freqs = set(self.domains[dom_id])
             valid_lit = []
+
+            if (fixed is not None):
+                lit = self.vars_matrix[u][self.freq_map[fixed]]
+                self.cnf.append([lit])
             
             for freq_val in self.freq_list:
                 f_idx = self.freq_map[freq_val]
@@ -172,51 +178,29 @@ class MOFAP_Solver:
             varY = self.id_map[constraint['v2']]
             operator = constraint['op']
             diff = constraint['diff']
-            pairs = [(varX, varY), (varY, varX)]
-            n_freqs = len(self.freq_list)
-            for varX, varY in pairs:
-                #get all available freqs, map each of them with the constraints
-                for i in range(n_freqs):
-                    lit_x_j = self.vars_matrix[varX][i]
-                    val_x = self.freq_list[i]
+            
+            # Get domains for both variables
+            domX = self.domains[self.variables[constraint['v1']]['dom']]
+            domY = self.domains[self.variables[constraint['v2']]['dom']]
+            
+            for f1 in domX:
+                idx1 = self.freq_map[f1]
+                lit_x = self.vars_matrix[varX][idx1]
+                
+                for f2 in domY:
+                    idx2 = self.freq_map[f2]
+                    lit_y = self.vars_matrix[varY][idx2]
+                    
+                    is_forbidden = False
                     if operator == '=':
-                        clause = [-lit_x_j]
-                        target_1 = val_x - diff
-                        target_2 = val_x + diff
-
-                        if target_1 in self.freq_map:
-                            clause.append(self.vars_matrix[varY][self.freq_map[target_1]])
-                        if target_2 in self.freq_map:
-                            clause.append(self.vars_matrix[varY][self.freq_map[target_2]])
-
-                        self.cnf.append(clause)
+                        if abs(f1 - f2) != diff:
+                            is_forbidden = True
                     elif operator == '>':
-                        effective_diff = diff + 1 # in case there exist a value exactly equal diff + f2 in freq map.
-                        lower_bound_index = -1
-                        target_lower = val_x - effective_diff
-                        upper_bound_index = -1
-                        target_higher = val_x + effective_diff
-                        #traverse all frequency, find the last frequency smaller than target lower, and the first bigger than target upper
-                        for k, freq_val in enumerate(self.freq_list):
-                            if freq_val <= target_lower:
-                                lower_bound_index = k
-                            if freq_val >= target_higher and upper_bound_index == -1:
-                                upper_bound_index = k
-                                break
-                        clause = [-lit_x_j]
-                        is_valid = False
-
-                        if lower_bound_index != -1:
-                            next_index = lower_bound_index + 1
-                            clause.append(-self.orders_matrix[varY][next_index])
-                            is_valid = True
-                        if  upper_bound_index != -1:
-                            clause.append(self.orders_matrix[varY][upper_bound_index])
-                            is_valid = True
-                        if not is_valid: #if frequency j is choosen for tower x, there exist no freq for tower y to choose -> UNSAT if choose so we ban
-                            self.cnf.append([-lit_x_j])
-                        else: 
-                            self.cnf.append(clause)
+                        if abs(f1 - f2) <= diff:
+                            is_forbidden = True
+                    
+                    if is_forbidden:
+                        self.cnf.append([-lit_x, -lit_y])
 
     def init_vars_matrix(self):
         n_vars = len(self.variable_ids)
@@ -318,11 +302,54 @@ class MOFAP_Solver:
                     'diff': deviation, 'hard': is_hard
                 })
 
-if (__name__ == "__main__"):
-    n_str = input("Enter the datasets link ");
-    print(f"Parsing data from {n_str}");
-    print("Current Working Directory:", os.getcwd())
-    print("Does path exist?", os.path.exists(n_str))
-    solver = MOFAP_Solver()
-    solver.solve(n_str)
+if __name__ == "__main__":
+    import os
+
+    # 1. SETUP PATHS
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_file = os.path.join(script_dir, "pairwise-results.txt")
+    
+    # 2. WIPE THE FILE CLEAN (The Fix)
+    # Opening in 'w' mode instantly deletes all old content
+    print(f"Cleaning previous results from: {output_file}", flush=True)
+    with open(output_file, "w") as f:
+        f.write("--- PAIRWISE AT MOST X BENCHMARK RUN ---\n")
+
+    # 3. GET INPUTS
+    base_path = input("Enter the directory containing datasets: ").strip()
+    scenarios = ["scen01", "scen02", "scen03", "scen04", "scen11", "graph01", "graph02", "graph08", "graph09", "graph14"]
+
+    # 4. RUN LOOP (Append Mode)
+    for scen in scenarios:
+        file_path = os.path.join(base_path, f"{scen}.txt")
+        if not os.path.exists(file_path):
+             file_path = os.path.join(base_path, scen)
+
+        if os.path.exists(file_path):
+            try:
+                print("-" * 40, flush=True)
+                print(f"Processing: {scen}", flush=True)
+                
+                solver = MOFAP_Solver()
+                best_val, effective_time, optimal_time = solver.solve(file_path)
+                
+                result_line = (
+                    f"{scen.upper()} "
+                    f"optimal = {best_val} "
+                    f"total time = {effective_time:.2f}s "
+                    f"effective time = {optimal_time:.2f}s"
+                )
+                print(f"Result: {result_line}", flush=True)
+
+                # 5. SAFE SAVE (Append)
+                # We use 'a' here so if Scen03 crashes, Scen01 and 02 are already saved.
+                with open(output_file, "a") as f:
+                    f.write(result_line + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+                
+            except Exception as e:
+                print(f"[ERROR] {scen}: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
 

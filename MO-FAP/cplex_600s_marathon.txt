@@ -1,0 +1,10 @@
+SCEN01 best_val=24 total_time=621.51s
+SCEN02 best_val=14 total_time=605.66s
+SCEN03 best_val=18 total_time=610.92s
+SCEN04 best_val=46 total_time=70.35s
+SCEN11 best_val=32 total_time=621.12s
+GRAPH01 best_val=18 total_time=4.01s
+GRAPH02 best_val=18 total_time=605.65s
+GRAPH08 best_val=22 total_time=611.62s
+GRAPH09 best_val=28 total_time=617.79s
+GRAPH14 best_val=16 total_time=614.74s

@@ -1,0 +1,11 @@
+--- ORDER ENCODING WEIGHT ADDING BENCHMARK ---
+SCEN01 optimal = 16 total time = 21.25s effective time = 1.16s
+SCEN02 optimal = 14 total time = 20.18s effective time = 0.18s
+SCEN03 optimal = 14 total time = 20.40s effective time = 0.38s
+SCEN04 optimal = 46 total time = 0.29s effective time = 0.28s
+SCEN11 optimal = 22 total time = 21.61s effective time = 1.56s
+GRAPH01 optimal = 18 total time = 20.18s effective time = 0.17s
+GRAPH02 optimal = 14 total time = 20.48s effective time = 0.46s
+GRAPH08 optimal = 18 total time = 20.95s effective time = 0.86s
+GRAPH09 optimal = 18 total time = 21.28s effective time = 1.20s
+GRAPH14 optimal = 8 total time = 21.30s effective time = 1.18s

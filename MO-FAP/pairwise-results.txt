@@ -1,0 +1,11 @@
+--- PAIRWISE WEIGHT ADDING BENCHMARK RUN ---
+SCEN01 optimal = 16 total time = 601.71s effective time = 1.63s
+SCEN02 optimal = 14 total time = 600.28s effective time = 0.27s
+SCEN03 optimal = 14 total time = 600.66s effective time = 0.63s
+SCEN04 optimal = 46 total time = 0.97s effective time = 0.96s
+SCEN11 optimal = 22 total time = 602.36s effective time = 2.32s
+GRAPH01 optimal = 18 total time = 600.35s effective time = 0.30s
+GRAPH02 optimal = 14 total time = 600.79s effective time = 0.76s
+GRAPH08 optimal = 18 total time = 601.53s effective time = 1.46s
+GRAPH09 optimal = 18 total time = 604.00s effective time = 3.95s
+GRAPH14 optimal = 8 total time = 631.45s effective time = 31.39s

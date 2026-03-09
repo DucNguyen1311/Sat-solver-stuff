@@ -1,0 +1,10 @@
+SCEN01 best=18 time=605.16s
+SCEN02 best=14 time=18.60s
+SCEN03 best=14 time=602.51s
+SCEN04 best=46 time=15.34s
+SCEN11 best=22 time=215.33s
+GRAPH01 best=18 time=5.19s
+GRAPH02 best=14 time=48.46s
+GRAPH08 best=18 time=230.82s
+GRAPH09 best=26 time=603.99s
+GRAPH14 best=8 time=484.23s

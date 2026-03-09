@@ -1,0 +1,8 @@
+    SCEN01 optimal = 24 total time = 219.88s 
+    SCEN02 optimal = 14 total time = 9.28s 
+    SCEN03 optimal = 14 total time = 212.48s 
+    SCEN04 optimal = 46 total time = 76.10s 
+    SCEN11 optimal = 24 total time = 222.18s 
+    GRAPH01 optimal = 18 total time = 5.30s 
+    GRAPH02 optimal = 14 total time = 11.28s 
+    GRAPH08 optimal = 32 total time = 211.91s 

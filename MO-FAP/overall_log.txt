@@ -1,0 +1,9 @@
+nohup: ignoring input
+Activating conda environment: cplex_env...
+Starting CPLEX Phase...
+python: can't open file '/home/ducnguyen/Work/SAT SOLVER STUFF/MO-FAP/cplex_standard.py': [Errno 2] No such file or directory
+CPLEX Phase Complete.
+-----------------------------------
+Starting Gurobi Phase...
+python: can't open file '/home/ducnguyen/Work/SAT SOLVER STUFF/MO-FAP/gurobi_standard.py': [Errno 2] No such file or directory
+Gurobi Phase Complete. All benchmarks finished.
