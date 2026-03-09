@@ -33,17 +33,10 @@ class MOFAP_Solver:
         n_freqs = len(self.freq_list)
         
         z_vars = [] 
-        for k in range (n_freqs):
+        for k in range(n_freqs):
             self.current_max_id += 1
             z_vars.append(self.current_max_id)
         
-        t_vars = []
-        for k in range (n_freqs):
-            self.current_max_id += 1
-            t_vars.append(self.current_max_id)
-
-        print(f"Created {len(z_vars)} Z vars and {len(t_vars)} trash vars.")
-
         count_links = 0
         for u_idx in range(len(self.variable_ids)):
             for k in range(n_freqs):
@@ -51,39 +44,27 @@ class MOFAP_Solver:
                 lit_z = z_vars[k]
                 self.cnf.append([-lit_x, lit_z])
                 count_links += 1
-        print(f"Added {count_links} linking clauses (x -> z).")
-
-        for k in range(n_freqs - 1):
-            self.cnf.append([-t_vars[k], t_vars[k+1]])
-
-        all_vars = z_vars + t_vars
-
-        n = len(all_vars)
+        
         S = []
-        # create matrix for sequence counter
-        for i in range(n - 1):
+        for i in range(n_freqs):
             row = []
             for j in range(n_freqs):
                 self.current_max_id += 1
                 row.append(self.current_max_id)
             S.append(row)
-        # base case
-        self.cnf.append([-all_vars[0], S[0][0]])
+            
+        self.cnf.append([-z_vars[0], S[0][0]])
 
-        # counting chain
-        for i in range(1, n - 1):
-            self.cnf.append([-all_vars[i], S[i][0]])
+        for i in range(1, n_freqs):
+            self.cnf.append([-z_vars[i], S[i][0]])
             self.cnf.append([-S[i-1][0], S[i][0]])
         
             for j in range(1, n_freqs):
-                self.cnf.append([-all_vars[i], -S[i-1][j-1], S[i][j]])
+                self.cnf.append([-z_vars[i], -S[i-1][j-1], S[i][j]])
                 self.cnf.append([-S[i-1][j], S[i][j]])
-            self.cnf.append([-all_vars[i], -S[i-1][n_freqs-1]])
-        self.cnf.append([-all_vars[-1], -S[n-2][n_freqs-1]])
-        print("Start Optimizing")
         
         best_result = n_freqs + 1
-        time_out = 20
+        time_out = 600
         last_sat_time = 0  
         
         # 1. MARK THE START: This is exactly when the solver begins working
@@ -91,7 +72,6 @@ class MOFAP_Solver:
         
         with Solver(name='Glucose42', bootstrap_with=self.cnf.clauses) as solver:
             while True:
-                # Calculate how much time has passed since we started the solver
                 elapsed_so_far = time.time() - solver_start_time
                 print(f"  > Solving... (Elapsed: {elapsed_so_far:.2f}s, Timeout Limit: {time_out}s)")
                 
@@ -101,7 +81,6 @@ class MOFAP_Solver:
                 timer.cancel()
                 
                 if is_sat:
-                    # 2. RECORD EFFECTIVE TIME: The moment a new best is found
                     last_sat_time = time.time() - solver_start_time
                     
                     model = solver.get_model()
@@ -115,12 +94,9 @@ class MOFAP_Solver:
                     target_result = current_result - 1
                     if target_result < 1:
                         print('Ideal solution reached.')
-                        break # Go to final return
+                        break
+                    solver.add_clause([-S[n_freqs-1][target_result]])
                     
-                    # Add constraint to find a better solution in the next iteration
-                    needed_trash_count = n_freqs - target_result
-                    trash_id_to_force_true = n_freqs - needed_trash_count
-                    solver.add_clause([t_vars[trash_id_to_force_true]])
                     continue
 
                 elif is_sat is False:
@@ -131,7 +107,6 @@ class MOFAP_Solver:
                     print(f"\n[TIMEOUT] Hit {time_out}s limit. Best: {best_result}")
                     break
         
-        # 3. CALCULATE TOTAL TIME: Current time minus the start (includes the final 20s)
         total_duration = time.time() - solver_start_time
         
         return best_result, total_duration, last_sat_time
