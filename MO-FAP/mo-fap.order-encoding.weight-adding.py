@@ -63,15 +63,13 @@ class MOFAP_Solver:
         print("Start Optimizing")
         
         best_result = n_freqs + 1
-        time_out = 20
+        time_out = 600
         last_sat_time = 0  
         
-        # 1. MARK THE START: This is exactly when the solver begins working
         solver_start_time = time.time()
         
         with Solver(name='Glucose42', bootstrap_with=self.cnf.clauses) as solver:
             while True:
-                # Calculate how much time has passed since we started the solver
                 elapsed_so_far = time.time() - solver_start_time
                 print(f"  > Solving... (Elapsed: {elapsed_so_far:.2f}s, Timeout Limit: {time_out}s)")
                 
@@ -81,7 +79,6 @@ class MOFAP_Solver:
                 timer.cancel()
                 
                 if is_sat:
-                    # 2. RECORD EFFECTIVE TIME: The moment a new best is found
                     last_sat_time = time.time() - solver_start_time
                     
                     model = solver.get_model()
@@ -96,8 +93,7 @@ class MOFAP_Solver:
                     if target_result < 1:
                         print('Ideal solution reached.')
                         break # Go to final return
-                    
-                    # Add constraint to find a better solution in the next iteration
+                
                     needed_trash_count = n_freqs - target_result
                     trash_id_to_force_true = n_freqs - needed_trash_count
                     solver.add_clause([t_vars[trash_id_to_force_true]])
@@ -111,7 +107,6 @@ class MOFAP_Solver:
                     print(f"\n[TIMEOUT] Hit {time_out}s limit. Best: {best_result}")
                     break
         
-        # 3. CALCULATE TOTAL TIME: Current time minus the start (includes the final 20s)
         total_duration = time.time() - solver_start_time
         
         return best_result, total_duration, last_sat_time
